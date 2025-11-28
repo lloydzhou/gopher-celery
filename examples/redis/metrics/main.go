@@ -11,12 +11,13 @@ import (
 
 	"github.com/go-kit/log"
 	celery "github.com/marselester/gopher-celery"
+	celeryredis "github.com/marselester/gopher-celery/redis"
 	"github.com/oklog/run"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
 
-const serverAddr = ":8080"
+const serverAddr = ":28080"
 
 func main() {
 	logger := log.NewJSONLogger(log.NewSyncWriter(os.Stderr))
@@ -44,17 +45,19 @@ func main() {
 	prometheus.MustRegister(m.duration)
 	http.Handle("/metrics", promhttp.Handler())
 
+	backend := celeryredis.NewBackend(nil)
 	app := celery.NewApp(
 		celery.WithLogger(logger),
 		celery.WithMiddlewares(m.middleware),
+		celery.WithBackend(backend),
 	)
 	app.Register(
 		"myproject.mytask",
 		"important",
-		func(ctx context.Context, p *celery.TaskParam) error {
+		func(ctx context.Context, p *celery.TaskParam) (interface{}, error) {
 			p.NameArgs("a", "b")
 			fmt.Printf("received a=%s b=%s\n", p.MustString("a"), p.MustString("b"))
-			return nil
+			return p.MustString("a") + p.MustString("b"), nil
 		},
 	)
 
@@ -94,10 +97,10 @@ type metrics struct {
 }
 
 func (m *metrics) middleware(next celery.TaskF) celery.TaskF {
-	return func(ctx context.Context, p *celery.TaskParam) (err error) {
+	return func(ctx context.Context, p *celery.TaskParam) (res interface{}, err error) {
 		name, ok := ctx.Value(celery.ContextKeyTaskName).(string)
 		if !ok {
-			return fmt.Errorf("task name not found in context")
+			return nil, fmt.Errorf("task name not found in context")
 		}
 
 		defer func(begin time.Time) {
@@ -110,6 +113,7 @@ func (m *metrics) middleware(next celery.TaskF) celery.TaskF {
 			}).Observe(time.Since(begin).Seconds())
 		}(time.Now())
 
-		return next(ctx, p)
+		res, err = next(ctx, p)
+		return res, err
 	}
 }

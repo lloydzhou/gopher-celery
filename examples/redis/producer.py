@@ -16,6 +16,7 @@ args = parser.parse_args()
 app = Celery(
     main='myproject',
     broker='redis://localhost:6379',
+    backend='redis://localhost:6379/0',
 )
 app.conf.update(
     CELERY_TASK_SERIALIZER='json',
@@ -27,4 +28,6 @@ app.conf.update(
 def mytask(a, b):
     pass
 
-mytask.apply_async(args=('fizz',), kwargs={'b': 'bazz'}, queue='important')
+result = mytask.apply_async(args=('fizz',), kwargs={'b': 'bazz'}, queue='important').get()
+
+print(f'Task result: {result}')

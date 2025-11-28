@@ -89,6 +89,11 @@ func WithMiddlewares(chain ...Middleware) Option {
 	}
 }
 
+// WithBackend enables a celery Backend and the recover middleware.
+func WithBackend(backend Backend) Option {
+	return WithMiddlewares(BackendMiddleware(backend))
+}
+
 // Config represents Celery settings.
 type Config struct {
 	logger     log.Logger

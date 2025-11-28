@@ -19,7 +19,7 @@ import (
 
 // TaskF represents a Celery task implemented by the client.
 // The error doesn't affect anything, it's logged though.
-type TaskF func(ctx context.Context, p *TaskParam) error
+type TaskF func(ctx context.Context, p *TaskParam) (interface{}, error)
 
 // Middleware is a chainable behavior modifier for tasks.
 // For example, a caller can collect task metrics.
@@ -39,6 +39,14 @@ type Broker interface {
 	// It blocks until there is a message available for consumption.
 	// Note, the method is not concurrency safe.
 	Receive() ([]byte, error)
+}
+
+// Backend is responsible for storing and retrieving task results.
+type Backend interface {
+	// Store saves a task result.
+	Store(key string, value []byte) error
+	// Load loads a task result.
+	Load(key string) ([]byte, error)
 }
 
 // AsyncParam represents parameters for sending a task message.
@@ -308,5 +316,6 @@ func (a *App) executeTask(ctx context.Context, m *protocol.Task) (err error) {
 	ctx = context.WithValue(ctx, ContextKeyTaskName, m.Name)
 	ctx = context.WithValue(ctx, ContextKeyTaskID, m.ID)
 	p := NewTaskParam(m.Args, m.Kwargs)
-	return task(ctx, p)
+	_, err = task(ctx, p)
+	return err
 }

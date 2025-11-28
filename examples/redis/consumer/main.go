@@ -9,6 +9,7 @@ import (
 
 	"github.com/go-kit/log"
 	celery "github.com/marselester/gopher-celery"
+	redisbackend "github.com/marselester/gopher-celery/goredis"
 )
 
 func main() {
@@ -16,14 +17,15 @@ func main() {
 
 	app := celery.NewApp(
 		celery.WithLogger(logger),
+		celery.WithBackend(redisbackend.NewBackend(nil)),
 	)
 	app.Register(
 		"myproject.mytask",
 		"important",
-		func(ctx context.Context, p *celery.TaskParam) error {
+		func(ctx context.Context, p *celery.TaskParam) (interface{}, error) {
 			p.NameArgs("a", "b")
 			fmt.Printf("received a=%s b=%s\n", p.MustString("a"), p.MustString("b"))
-			return nil
+			return p.MustString("a") + p.MustString("b"), nil
 		},
 	)
 
