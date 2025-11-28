@@ -16,6 +16,7 @@ args = parser.parse_args()
 app = Celery(
     main='myproject',
     broker='amqp://guest:guest@localhost:5672/',
+    backend='redis://localhost:6379/0',
 )
 app.conf.update(
     CELERY_TASK_SERIALIZER='json',
@@ -24,7 +25,11 @@ app.conf.update(
 
 
 @app.task
-def mytask(a, b):
+def mytask(a: str, b: str) -> str:
+    # This is just a placeholder function. The actual task will be executed by the worker.
     pass
 
-mytask.apply_async(args=('fizz',), kwargs={'b': 'bazz'}, queue='important')
+
+result = mytask.apply_async(args=('fizz',), kwargs={'b': 'bazz'}, queue='important').get()
+
+print(f'Task result: {result}')

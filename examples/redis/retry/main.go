@@ -48,7 +48,7 @@ type requestor struct {
 	logger     log.Logger
 }
 
-func (rq *requestor) request(ctx context.Context, p *celery.TaskParam) error {
+func (rq *requestor) request(ctx context.Context, p *celery.TaskParam) (interface{}, error) {
 	// Make 3 delivery attempts with exponential backoff (1st attempt and 2 retries).
 	// The 5 seconds multiplier increases the wait intervals.
 	// Max waiting time between attempts is 15 seconds.
@@ -58,7 +58,7 @@ func (rq *requestor) request(ctx context.Context, p *celery.TaskParam) error {
 		backoff.WithMaxWait(15*time.Second),
 	)
 
-	return backoff.Run(ctx, r, func(attempt int) (err error) {
+	err := backoff.Run(ctx, r, func(attempt int) (err error) {
 		if err = rq.work(); err != nil {
 			rq.logger.Log("msg", "request failed", "attempt", attempt, "err", err)
 		} else {
@@ -66,6 +66,7 @@ func (rq *requestor) request(ctx context.Context, p *celery.TaskParam) error {
 		}
 		return err
 	})
+	return nil, err
 }
 
 // work is a dummy function that imitates work.

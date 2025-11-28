@@ -37,17 +37,19 @@ func main() {
 	broker := celeryredis.NewBroker(
 		celeryredis.WithClient(c),
 	)
+	backend := celeryredis.NewBackend(c)
 	app := celery.NewApp(
 		celery.WithBroker(broker),
+		celery.WithBackend(backend),
 		celery.WithLogger(logger),
 	)
 	app.Register(
 		"myproject.mytask",
 		"important",
-		func(ctx context.Context, p *celery.TaskParam) error {
+		func(ctx context.Context, p *celery.TaskParam) (interface{}, error) {
 			p.NameArgs("a", "b")
 			fmt.Printf("received a=%s b=%s\n", p.MustString("a"), p.MustString("b"))
-			return nil
+			return p.MustString("a") + p.MustString("b"), nil
 		},
 	)
 

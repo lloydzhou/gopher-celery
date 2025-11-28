@@ -21,9 +21,9 @@ func TestExecuteTaskPanic(t *testing.T) {
 	app.Register(
 		"myproject.apps.myapp.tasks.mytask",
 		"important",
-		func(ctx context.Context, p *TaskParam) error {
+		func(ctx context.Context, p *TaskParam) (interface{}, error) {
 			_ = p.Args()[100]
-			return nil
+			return nil, nil
 		},
 	)
 
@@ -52,15 +52,15 @@ func TestExecuteTaskMiddlewares(t *testing.T) {
 		"A-B-task": {
 			middlewares: []Middleware{
 				func(next TaskF) TaskF {
-					return func(ctx context.Context, p *TaskParam) error {
-						err := next(ctx, p)
-						return fmt.Errorf("A -> %w", err)
+					return func(ctx context.Context, p *TaskParam) (interface{}, error) {
+						_, err := next(ctx, p)
+						return nil, fmt.Errorf("A -> %w", err)
 					}
 				},
 				func(next TaskF) TaskF {
-					return func(ctx context.Context, p *TaskParam) error {
-						err := next(ctx, p)
-						return fmt.Errorf("B -> %w", err)
+					return func(ctx context.Context, p *TaskParam) (interface{}, error) {
+						_, err := next(ctx, p)
+						return nil, fmt.Errorf("B -> %w", err)
 					}
 				},
 			},
@@ -69,9 +69,9 @@ func TestExecuteTaskMiddlewares(t *testing.T) {
 		"A-task": {
 			middlewares: []Middleware{
 				func(next TaskF) TaskF {
-					return func(ctx context.Context, p *TaskParam) error {
-						err := next(ctx, p)
-						return fmt.Errorf("A -> %w", err)
+					return func(ctx context.Context, p *TaskParam) (interface{}, error) {
+						_, err := next(ctx, p)
+						return nil, fmt.Errorf("A -> %w", err)
 					}
 				},
 			},
@@ -108,8 +108,8 @@ func TestExecuteTaskMiddlewares(t *testing.T) {
 			app.Register(
 				"myproject.apps.myapp.tasks.mytask",
 				"important",
-				func(ctx context.Context, p *TaskParam) error {
-					return fmt.Errorf("task")
+				func(ctx context.Context, p *TaskParam) (interface{}, error) {
+					return nil, fmt.Errorf("task")
 				},
 			)
 
@@ -141,12 +141,12 @@ func TestProduceAndConsume(t *testing.T) {
 	app.Register(
 		"myproject.apps.myapp.tasks.mytask",
 		"important",
-		func(ctx context.Context, p *TaskParam) error {
+		func(ctx context.Context, p *TaskParam) (interface{}, error) {
 			defer cancel()
 
 			p.NameArgs("a", "b")
 			sum = p.MustInt("a") + p.MustInt("b")
-			return nil
+			return nil, nil
 		},
 	)
 	if err := app.Run(ctx); err != nil {
@@ -181,13 +181,13 @@ func TestProduceAndConsume100times(t *testing.T) {
 	app.Register(
 		"myproject.apps.myapp.tasks.mytask",
 		"important",
-		func(ctx context.Context, p *TaskParam) error {
+		func(ctx context.Context, p *TaskParam) (interface{}, error) {
 			p.NameArgs("a", "b")
 			atomic.AddInt32(
 				&sum,
 				int32(p.MustInt("a")+p.MustInt("b")),
 			)
-			return nil
+			return nil, nil
 		},
 	)
 	if err := app.Run(ctx); err != nil {
@@ -225,13 +225,13 @@ func TestGoredisProduceAndConsume100times(t *testing.T) {
 	app.Register(
 		"myproject.apps.myapp.tasks.mytask",
 		"important",
-		func(ctx context.Context, p *TaskParam) error {
+		func(ctx context.Context, p *TaskParam) (interface{}, error) {
 			p.NameArgs("a", "b")
 			atomic.AddInt32(
 				&sum,
 				int32(p.MustInt("a")+p.MustInt("b")),
 			)
-			return nil
+			return sum, nil
 		},
 	)
 	if err := app.Run(ctx); err != nil {
@@ -280,13 +280,13 @@ func TestRabbitmqProduceAndConsume100times(t *testing.T) {
 	app.Register(
 		"myproject.apps.myapp.tasks.mytask",
 		queue,
-		func(ctx context.Context, p *TaskParam) error {
+		func(ctx context.Context, p *TaskParam) (interface{}, error) {
 			p.NameArgs("a", "b")
 			atomic.AddInt32(
 				&sum,
 				int32(p.MustInt("a")+p.MustInt("b")),
 			)
-			return nil
+			return sum, nil
 		},
 	)
 	if err := app.Run(ctx); err != nil {
@@ -317,7 +317,7 @@ func TestConsumeSequentially(t *testing.T) {
 	t.Cleanup(cancel)
 
 	var t1Done, t2Done atomic.Bool
-	app.Register("t1", "q", func(ctx context.Context, p *TaskParam) error {
+	app.Register("t1", "q", func(ctx context.Context, p *TaskParam) (interface{}, error) {
 		time.Sleep(100 * time.Millisecond)
 
 		if t2Done.Load() {
@@ -325,15 +325,15 @@ func TestConsumeSequentially(t *testing.T) {
 		}
 		t1Done.Store(true)
 
-		return nil
+		return nil, nil
 	})
-	app.Register("t2", "q", func(ctx context.Context, p *TaskParam) error {
+	app.Register("t2", "q", func(ctx context.Context, p *TaskParam) (interface{}, error) {
 		if !t1Done.Load() {
 			t.Error("t2 started before t1 finished")
 		}
 		t2Done.Store(true)
 
-		return nil
+		return nil, nil
 	})
 	if err := app.Run(ctx); err != nil {
 		t.Error(err)

@@ -12,7 +12,11 @@ import (
 func main() {
 	logger := log.NewJSONLogger(log.NewSyncWriter(os.Stderr))
 
-	broker := celeryrabbitmq.NewBroker(celeryrabbitmq.WithAmqpUri("amqp://guest:guest@localhost:5672/"))
+	broker, e := celeryrabbitmq.NewBroker(celeryrabbitmq.WithAmqpUri("amqp://guest:guest@localhost:5672/"))
+	if e != nil {
+		logger.Log("msg", "failed to create broker", "err", e)
+		return
+	}
 	app := celery.NewApp(
 		celery.WithBroker(broker),
 		celery.WithLogger(logger),
@@ -21,7 +25,7 @@ func main() {
 	err := app.Delay("myproject.mytask", "important", "fizz", "bazz")
 	logger.Log("msg", "task was sent using protocol v2", "err", err)
 
-	broker = celeryrabbitmq.NewBroker(celeryrabbitmq.WithAmqpUri("amqp://guest:guest@localhost:5672/"))
+	broker, err = celeryrabbitmq.NewBroker(celeryrabbitmq.WithAmqpUri("amqp://guest:guest@localhost:5672/"))
 	app = celery.NewApp(
 		celery.WithBroker(broker),
 		celery.WithLogger(logger),
